@@ -23,6 +23,9 @@ typedef enum
 int SDL_ShowSimpleMessageBox(uint32_t flags, const char *title, const char *message, SDL_Window *window);
 ]]
 
+-- Windows...
+local sdl = jit.os == "Windows" and ffi.load("SDL2") or ffi.C
+
 local typeconstants = {
 	info = ffi.C.SDL_MESSAGEBOX_INFORMATION,
 	warning = ffi.C.SDL_MESSAGEBOX_WARNING,
@@ -49,9 +52,9 @@ function ShowSimpleMessageBox(mtype, title, message, standalone)
 	
 	local window = nil
 	if not standalone then
-		window = ffi.C.SDL_GL_GetCurrentWindow()
+		window = sdl.SDL_GL_GetCurrentWindow()
 	end
 	
-	local result = ffi.C.SDL_ShowSimpleMessageBox(flags, title, message, window)
+	local result = sdl.SDL_ShowSimpleMessageBox(flags, title, message, window)
 	return result >= 0
 end
