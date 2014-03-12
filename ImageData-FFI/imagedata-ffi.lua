@@ -5,9 +5,9 @@ as you see fit.
 ]]
 
 --[[
-Unlike LÖVE's regular ImageData methods, this is *NOT THREAD-SAFE!*
+Unlike LÖVE's regular ImageData methods, these are *NOT THREAD-SAFE!*
 You *need* to do your own synchronization if you want to use ImageData in
-threads with this method.
+threads with these methods.
 ]]
 
 assert(love and love.image, "love.image is required")
@@ -33,8 +33,36 @@ local function inside(x, y, w, h)
 	return x >= 0 and x < w and y >= 0 and y < h
 end
 
+local id_mt
+if debug then
+	id_mt = debug.getregistry()["ImageData"]
+else
+	id_mt = getmetatable(love.image.newImageData(1,1))
+end
+
+local _getWidth = id_mt.__index.getWidth
+local _getHeight = id_mt.__index.getHeight
+local _getDimensions = id_mt.__index.getDimensions
+
+-- Holds ImageData objects as keys, and information about the objects as values.
+-- Weak keys so the ImageData objects can still be GC'd properly.
+local id_registry = {__mode = "k"}
+
+function id_registry:__index(imagedata)
+	local width, height = _getDimensions(imagedata)
+	local pointer = ffi.cast(pixelptr, imagedata:getPointer())
+	local p = {width=width, height=height, pointer=pointer}
+	self[imagedata] = p
+	return p
+end
+
+setmetatable(id_registry, id_registry)
+
+
+-- FFI version of ImageData:mapPixel, with no thread-safety.
 local function ImageData_FFI_mapPixel(imagedata, func, ix, iy, iw, ih)
-	local idw, idh = imagedata:getDimensions()
+	local p = id_registry[imagedata]
+	local idw, idh = p.width, p.height
 	
 	ix = ix or 0
 	iy = iy or 0
@@ -43,7 +71,7 @@ local function ImageData_FFI_mapPixel(imagedata, func, ix, iy, iw, ih)
 	
 	assert(inside(ix, iy, idw, idh) and inside(ix+iw-1, iy+ih-1, idw, idh), "Invalid rectangle dimensions")
 	
-	local pixels = ffi.cast(pixelptr, imagedata:getPointer())
+	local pixels = p.pointer
 	
 	for y=iy, iy+ih-1 do
 		for x=ix, ix+iw-1 do
@@ -57,11 +85,49 @@ local function ImageData_FFI_mapPixel(imagedata, func, ix, iy, iw, ih)
 	end
 end
 
-local mt
-if debug then
-	mt = debug.getregistry()["ImageData"]
-else
-	mt = getmetatable(love.image.newImageData(1,1))
+-- FFI version of ImageData:getPixel, with no thread-safety.
+local function ImageData_FFI_getPixel(imagedata, x, y)
+	local p = id_registry[imagedata]
+	assert(inside(x, y, p.width, p.height), "Attempt to get out-of-range pixel!")
+	
+	local pixel = p.pointer[y * p.width + x]
+	return tonumber(pixel.r), tonumber(pixel.g), tonumber(pixel.b), tonumber(pixel.a)
 end
 
-mt.__index.mapPixel = ImageData_FFI_mapPixel
+-- FFI version of ImageData:setPixel, with no thread-safety.
+local function ImageData_FFI_setPixel(imagedata, x, y, r, g, b, a)
+	a = a or 255
+	local p = id_registry[imagedata]
+	assert(inside(x, y, p.width, p.height), "Attempt to set out-of-range pixel!")
+	
+	local pixel = p.pointer[y * p.width + x]
+	pixel.r = r
+	pixel.g = g
+	pixel.b = b
+	pixel.a = a
+end
+
+-- FFI version of ImageData:getWidth.
+local function ImageData_FFI_getWidth(imagedata)
+	return id_registry[imagedata].width
+end
+
+-- FFI version of ImageData:getHeight.
+local function ImageData_FFI_getHeight(imagedata)
+	return id_registry[imagedata].height
+end
+
+-- FFI version of ImageData:getDimensions.
+local function ImageData_FFI_getDimensions(imagedata)
+	local p = id_registry[imagedata]
+	return p.width, p.height
+end
+
+
+-- Overwrite love's functions with the new FFI versions.
+id_mt.__index.mapPixel = ImageData_FFI_mapPixel
+id_mt.__index.getPixel = ImageData_FFI_getPixel
+id_mt.__index.setPixel = ImageData_FFI_setPixel
+id_mt.__index.getWidth = ImageData_FFI_getWidth
+id_mt.__index.getHeight = ImageData_FFI_getHeight
+id_mt.__index.getDimensions = ImageData_FFI_getDimensions
