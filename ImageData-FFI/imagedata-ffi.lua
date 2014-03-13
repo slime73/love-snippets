@@ -13,7 +13,7 @@ the normal ImageData methods couldn't be compiled by the JIT.
 
 --[[
 NOTE: This was written specifically for LÖVE 0.9.0 and 0.9.1. Future versions
-of LÖVE may change SoundData (either internally or externally) enough to cause
+of LÖVE may change ImageData (either internally or externally) enough to cause
 these replacements to break horribly.
 ]]
 
