@@ -5,6 +5,19 @@ as you see fit.
 ]]
 
 --[[
+Replaces several ImageData methods with FFI implementations. This can result
+in a performance increase of up to 60x when calling the methods, especially
+in simple code which had to fall back to interpreted mode specifically because
+the normal ImageData methods couldn't be compiled by the JIT.
+]]
+
+--[[
+NOTE: This was written specifically for LÖVE 0.9.0 and 0.9.1. Future versions
+of LÖVE may change SoundData (either internally or externally) enough to cause
+these replacements to break horribly.
+]]
+
+--[[
 Unlike LÖVE's regular ImageData methods, these are *NOT THREAD-SAFE!*
 You *need* to do your own synchronization if you want to use ImageData in
 threads with these methods.
@@ -20,10 +33,7 @@ local ffi = require("ffi")
 pcall(ffi.cdef, [[
 typedef struct ImageData_Pixel
 {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	uint8_t a;
+	uint8_t r, g, b, a;
 } ImageData_Pixel;
 ]])
 
@@ -33,19 +43,19 @@ local function inside(x, y, w, h)
 	return x >= 0 and x < w and y >= 0 and y < h
 end
 
-local id_mt
+local imagedata_mt
 if debug then
-	id_mt = debug.getregistry()["ImageData"]
+	imagedata_mt = debug.getregistry()["ImageData"]
 else
-	id_mt = getmetatable(love.image.newImageData(1,1))
+	imagedata_mt = getmetatable(love.image.newImageData(1,1))
 end
 
-local _getWidth = id_mt.__index.getWidth
-local _getHeight = id_mt.__index.getHeight
-local _getDimensions = id_mt.__index.getDimensions
+local _getWidth = imagedata_mt.__index.getWidth
+local _getHeight = imagedata_mt.__index.getHeight
+local _getDimensions = imagedata_mt.__index.getDimensions
 
 -- Holds ImageData objects as keys, and information about the objects as values.
--- Weak keys so the ImageData objects can still be GC'd properly.
+-- Uses weak keys so the ImageData objects can still be GC'd properly.
 local id_registry = {__mode = "k"}
 
 function id_registry:__index(imagedata)
@@ -80,7 +90,7 @@ local function ImageData_FFI_mapPixel(imagedata, func, ix, iy, iw, ih)
 			pixels[y*idw+x].r = r
 			pixels[y*idw+x].g = g
 			pixels[y*idw+x].b = b
-			pixels[y*idw+x].a = a ~= nil and a or 255
+			pixels[y*idw+x].a = a == nil and 255 or a
 		end
 	end
 end
@@ -96,7 +106,7 @@ end
 
 -- FFI version of ImageData:setPixel, with no thread-safety.
 local function ImageData_FFI_setPixel(imagedata, x, y, r, g, b, a)
-	a = a or 255
+	a = a == nil and 255 or a
 	local p = id_registry[imagedata]
 	assert(inside(x, y, p.width, p.height), "Attempt to set out-of-range pixel!")
 	
@@ -125,9 +135,9 @@ end
 
 
 -- Overwrite love's functions with the new FFI versions.
-id_mt.__index.mapPixel = ImageData_FFI_mapPixel
-id_mt.__index.getPixel = ImageData_FFI_getPixel
-id_mt.__index.setPixel = ImageData_FFI_setPixel
-id_mt.__index.getWidth = ImageData_FFI_getWidth
-id_mt.__index.getHeight = ImageData_FFI_getHeight
-id_mt.__index.getDimensions = ImageData_FFI_getDimensions
+imagedata_mt.__index.mapPixel = ImageData_FFI_mapPixel
+imagedata_mt.__index.getPixel = ImageData_FFI_getPixel
+imagedata_mt.__index.setPixel = ImageData_FFI_setPixel
+imagedata_mt.__index.getWidth = ImageData_FFI_getWidth
+imagedata_mt.__index.getHeight = ImageData_FFI_getHeight
+imagedata_mt.__index.getDimensions = ImageData_FFI_getDimensions
