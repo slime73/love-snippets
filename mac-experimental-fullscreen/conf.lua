@@ -6,11 +6,16 @@ as you see fit.
 
 
 --[[
-SDL 2.0.2's experimental fullscreen support for Mac OS 10.7+ (fullscreen button
-on the top-right of the window), enabled via LuaJIT's FFI.
+LÖVE 0.9.0 for OS X uses a development version of SDL in between 2.0.1 and 2.0.2.
+It includes experimental support for Mac OS 10.7's Spaces-aware fullscreen
+(including the button on the top-right of the window.) This snippet enables the
+experimental fullscreen support via LuaJIT's FFI.
 
-This snippet *needs* to be in conf.lua because it has to be executed before the
-window module is required.
+LÖVE 0.9.1 for OS X uses SDL 2.0.2, which has a much more robust version of this
+enabled by default, so this snippet only works in 0.9.0.
+
+This *needs* to be in conf.lua because it has to be executed before the window
+module is loaded.
 ]]
 
 
