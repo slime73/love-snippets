@@ -24,7 +24,7 @@ local tonumber, assert = tonumber, assert
 
 local ffi = require("ffi")
 
-local bytetypes = {ffi.typeof("int8_t *"), ffi.typeof("int16_t *")}
+local datatypes = {ffi.typeof("uint8_t *"), ffi.typeof("int16_t *")}
 local typemaxvals = {0x7F, 0x7FFF}
 
 
@@ -45,7 +45,7 @@ local sd_registry = {__mode = "k"}
 
 function sd_registry:__index(sounddata)
 	local bytedepth = _getBitDepth(sounddata) / 8
-	local pointer = ffi.cast(bytetypes[bytedepth], sounddata:getPointer())
+	local pointer = ffi.cast(datatypes[bytedepth], sounddata:getPointer())
 	
 	local p = {
 		bytedepth=bytedepth,
@@ -67,14 +67,26 @@ setmetatable(sd_registry, sd_registry)
 local function SoundData_FFI_getSample(sounddata, i)
 	local p = sd_registry[sounddata]
 	assert(i >= 0 and i < p.size/p.bytedepth, "Attempt to get out-of-range sample!")
-	return tonumber(p.pointer[i]) / p.maxvalue
+	if p.bytedepth == 2 then
+		-- 16-bit data is stored as signed values internally.
+		return tonumber(p.pointer[i]) / p.maxvalue
+	else
+		-- 8-bit data is stored as unsigned values internally.
+		return (tonumber(p.pointer[i]) - 128) / 127
+	end
 end
 
 -- FFI version of SoundData:setSample
 local function SoundData_FFI_setSample(sounddata, i, value)
 	local p = sd_registry[sounddata]
 	assert(i >= 0 and i < p.size/p.bytedepth, "Attempt to set out-of-range sample!")
-	p.pointer[i] = value * p.maxvalue
+	if p.bytedepth == 2 then
+		-- 16-bit data is stored as signed values internally.
+		p.pointer[i] = value * p.maxvalue
+	else
+		 -- 8-bit data is stored as unsigned values internally.
+		p.pointer[i] = (value * 127) + 128
+	end
 end
 
 -- FFI version of SoundData:getSampleCount
