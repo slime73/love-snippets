@@ -48,13 +48,6 @@ ffi.cdef[[
 
 ]]
 
-local types = {
-	SDL_TouchID = ffi.typeof("SDL_TouchID"),
-	SDL_FingerID = ffi.typeof("SDL_FingerID"),
-	SDL_Finger = ffi.typeof("SDL_Finger"),
-	SDL_FingerPtr = ffi.typeof("SDL_Finger *"),
-}
-
 -- Windows...
 local sdl = ffi.os == "Windows" and ffi.load("SDL2") or ffi.C
 
@@ -75,8 +68,7 @@ function touch.getTouch(index)
 	assert(type(index) == "number")
 	index = index - 1
 	
-	local deviceID = types.SDL_TouchID(0)
-	
+	local deviceID
 	local touchcount = 0
 	local fingerindex = -1
 	
