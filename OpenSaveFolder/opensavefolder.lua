@@ -6,8 +6,15 @@ as you see fit.
 
 -- Opens the game's save directory (or a subfolder wthin it) in the system's
 -- file browser. Written for LÖVE 0.9.0+.
+-- LÖVE 0.9.1 includes love.system.openURL which can accomplish this as well.
 function OpenSaveFolder(subfolder)
 	subfolder = subfolder or ""
+	
+	-- If we have LÖVE 0.9.1+, we use love.system.openURL. It works better.
+	if love.system and love.system.openURL then
+		local url = "file://"..love.filesystem.getSaveDirectory().."/"..subfolder
+		return love.system.openURL(url)
+	end
 	
 	local osname = love.system.getOS()
 	local path = love.filesystem.getSaveDirectory().."/"..subfolder
