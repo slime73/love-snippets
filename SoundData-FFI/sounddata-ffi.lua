@@ -18,7 +18,12 @@ these replacements to break horribly.
 ]]
 
 assert(love and love.sound, "love.sound is required")
-assert(jit, "LuaJIT is required")
+
+if type(jit) ~= "table" or not jit.status() then
+	-- LuaJIT's FFI is *much* slower than LOVE's regular methods when the JIT
+	-- compiler is disabled.
+	return
+end
 
 local tonumber, assert = tonumber, assert
 
